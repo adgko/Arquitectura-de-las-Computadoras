@@ -16,26 +16,31 @@ module uart_rx
    );
     
   reg [7:0]     r_Clock_Count = 0;
-  reg [3:0]     r_Bit_Index   = 0; //8 bits total
+  reg [2:0]     r_Bit_Index   = 0; //8 bits total
   reg [7:0]     r_Rx_Byte     = 0;
   reg           r_Rx_done       = 0;
   reg [2:0]     r_next_state     = 0;
   reg [3:0]     r_current_state = 0;
+  reg last_Rx_Serial=0;
    
   // Purpose: Control RX state machine
-  always @(posedge i_Clock)
+  always @(*)
       begin
       if(i_reset) 
         begin
-            r_current_state <= s_IDLE;
+            r_current_state = s_IDLE;
         end
-      else  r_current_state<=r_next_state;
-      
+      else begin
+       r_current_state=r_next_state;
+      end
+     end
+     
+   always @(*) begin
       case (r_current_state)
         s_IDLE :
           begin
-            r_Rx_done       <= 1'b0;
-            r_Bit_Index   <= 0;
+            r_Rx_done       = 1'b0;
+            r_Bit_Index   = 0;
           end
         
         // Check middle of start bit to make sure it's still low
@@ -47,15 +52,15 @@ module uart_rx
           begin
             if (i_bd)
               begin
-                r_Rx_Byte[r_Bit_Index] <= i_Rx_Serial;
+                r_Rx_Byte[r_Bit_Index] = i_Rx_Serial;
                 // Check if we have received all bits
                 if (r_Bit_Index < 7)
                   begin
-                    r_Bit_Index <= r_Bit_Index + 1;                   
+                    r_Bit_Index = r_Bit_Index + 1;                   
                   end
                 else
                   begin
-                    r_Bit_Index <= 0;
+                    r_Bit_Index = 0;
                   end
               end
           end // case: s_RX_DATA_BITS
@@ -66,7 +71,7 @@ module uart_rx
           begin
             if (i_bd)
               begin
-                    r_Rx_done       <= 1'b1;         
+                    r_Rx_done       = 1'b1;         
               end
           end // case: s_RX_STOP_BIT
      
@@ -74,12 +79,15 @@ module uart_rx
         // Stay here 1 clock
         s_CLEANUP :
           begin
-            r_Rx_done   <= 1'b0;
+            r_Rx_done   = 1'b0;
           end
          
          
         default :
-          r_current_state <= s_IDLE;
+        begin
+          r_Rx_done       = 1'b0;
+            r_Bit_Index   = 0;
+        end
          
       endcase
     end
@@ -91,14 +99,18 @@ module uart_rx
           if(i_reset) 
             begin
                 r_next_state = s_IDLE;
-            end     
+            end
           case (r_current_state)
             s_IDLE :
               begin
-                if (i_Rx_Serial == 1'b0)          // Start bit detected
+                if (i_Rx_Serial == 1'b0 && last_Rx_Serial)          // Start bit detected
+                begin
                   r_next_state = s_RX_START_BIT;
-                else
+                  end
+                else begin
+                  last_Rx_Serial= i_Rx_Serial;
                   r_next_state = s_IDLE;
+                  end
               end
              
             // Check middle of start bit to make sure it's still low
@@ -131,6 +143,7 @@ module uart_rx
                       end
                     else
                       begin
+                        last_Rx_Serial= i_Rx_Serial;
                         r_next_state   = s_RX_STOP_BIT;
                       end
                   end

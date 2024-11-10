@@ -12,7 +12,7 @@ module uart_tx
    input        i_bd,
    input        i_reset,
    output      o_Tx_Active,
-   output   reg   o_Tx_Serial,
+   output     o_Tx_Serial,
    output      o_Tx_Done
    );
   
@@ -25,7 +25,7 @@ module uart_tx
   reg          r_Tx_Active   = 0;
   reg [3:0]    r_current_state = 0;
   reg [3:0]    r_next_state = 0;
-  reg           r_tx_serial=0;
+  reg r_Tx_Serial=1;
      
      
   //si hay cambio de tick, agrega uno al contador
@@ -35,31 +35,30 @@ module uart_tx
         tick_count_aux = tick_count_reg+1;
     end
    end*/
-   
-  always @(posedge i_Clock)
-    begin
-       
-    end
      
-  always @(posedge i_Clock)
+  always @(*)
     begin
        if(i_reset) begin
-         r_current_state <= s_IDLE;
+         r_current_state = s_IDLE;
        end
        else begin
-         r_current_state<=r_next_state;
+         r_current_state=r_next_state;
        end
+    end
+    
+   always @(*) begin
       
       case (r_current_state)
         s_IDLE :
           begin
-            o_Tx_Serial   <= 1'b1;         // Drive Line High for Idle
-            r_Tx_Done     <= 1'b0;
-            r_Bit_Index   <= 0;
+            r_Tx_Done     = 1'b0;
+            r_Bit_Index   = 0;
+            r_Tx_Active   = 1'b0;
+
             
             if (i_Tx_Start == 1'b1)
               begin
-                r_Tx_Active <= 1'b1;
+                r_Tx_Active = 1'b1;
               end
           end // case: s_IDLE
          
@@ -67,31 +66,32 @@ module uart_tx
         // Send out Start Bit. Start bit = 0
         s_TX_START_BIT :
           begin
-            o_Tx_Serial <= 1'b0;
+            r_Tx_Serial = 1'b0;
              
             // Wait CLKS_PER_BIT-1 clock cycles for start bit to finish
             if (i_bd)
               begin
-                r_Tx_Data   <= i_Tx_Byte;
+                r_Tx_Data   = i_Tx_Byte;
               end
           end // case: s_TX_START_BIT
          
         // Wait CLKS_PER_BIT-1 clock cycles for data bits to finish         
         s_TX_DATA_BITS :
           begin
-           
-            o_Tx_Serial <= r_Tx_Data[r_Bit_Index];
+
              
             if (i_bd)
               begin
                 // Check if we have sent out all bits
+                r_Tx_Serial = r_Tx_Data[r_Bit_Index];
+
                 if (r_Bit_Index < 7)
                   begin
-                    r_Bit_Index <= r_Bit_Index + 1;
+                    r_Bit_Index = r_Bit_Index + 1;
                   end
                 else
                   begin
-                    r_Bit_Index <= 0;
+                    r_Bit_Index = 0;
                   end
               end
           end // case: s_TX_DATA_BITS
@@ -100,13 +100,12 @@ module uart_tx
         // Send out Stop bit.  Stop bit = 1
         s_TX_STOP_BIT :
           begin
-            o_Tx_Serial <= 1'b1;
+            r_Tx_Serial = 1'b1;
              
             // Wait CLKS_PER_BIT-1 clock cycles for Stop bit to finish
             if (i_bd)
               begin
-                r_Tx_Done     <= 1'b1;
-                r_Tx_Active   <= 1'b0;
+                r_Tx_Done     = 1'b1;
               end
           end // case: s_Tx_STOP_BIT
          
@@ -114,12 +113,18 @@ module uart_tx
         // Stay here 1 clock
         s_CLEANUP :
           begin
-            r_Tx_Done <= 1'b0;
+            r_Tx_Done = 1'b0;
+            r_Tx_Serial   = 1'b1;         // Drive Line High for Idle
+
           end
          
          
         default :
-          r_current_state <= s_IDLE;
+          begin
+            r_Tx_Serial   = 1'b1;         // Drive Line High for Idle
+            r_Tx_Done     = 1'b0;
+            r_Bit_Index   = 0;
+          end
          
       endcase
     end
@@ -204,5 +209,6 @@ module uart_tx
  
   assign o_Tx_Active = r_Tx_Active;
   assign o_Tx_Done   = r_Tx_Done;
+  assign o_Tx_Serial=r_Tx_Serial;
    
 endmodule
