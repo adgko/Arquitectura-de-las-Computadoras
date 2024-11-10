@@ -2,7 +2,7 @@
 
 module br_gen
 #(
-    parameter CLOCK_FREQUENCY   = 25E6,  // 25 [MHz]
+    parameter CLOCK_FREQUENCY   = 50E6,  // 25 [MHz]
     parameter BAUD_RATE         = 19200
 )
 (
@@ -11,8 +11,8 @@ module br_gen
     output  wire    o_tick
 );
 
-  localparam TICK_RATE     = CLOCK_FREQUENCY / ( 16 * BAUD_RATE ); // 81.7
-  localparam COUNT_NBITS   = $clog2( TICK_RATE );  // 7
+   localparam TICK_RATE     = CLOCK_FREQUENCY / ( 16 * BAUD_RATE ); // 81.7
+   localparam COUNT_NBITS   = $clog2( TICK_RATE );  // 7
 
    reg  [COUNT_NBITS-1:0]   counter;
 
