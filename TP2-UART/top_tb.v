@@ -1,6 +1,10 @@
 `timescale 1ns / 1ps
 
-module top_tb();
+module top_tb#()(
+    input i_clock
+   // output [Bits-1:0] LED
+    //output LED2
+);
 
     localparam Bits = 8;
     localparam T = 40;
@@ -27,7 +31,7 @@ module top_tb();
 
     top #() TOP
     (
-        .r_Clock(o_clock),
+        .i_clock(o_clock),
         .r_reset(o_reset),
         .rx_data(tb_tx_serial),
         .tx_data(tb_rx_data)
@@ -99,4 +103,5 @@ assign o_clock= r_Clock;
 assign o_clock50 =r_Clock50;
 assign o_tx_start =tx_start;
 assign o_tb_tx_byte=tb_tx_byte;
+assign o_reset = r_reset;
 endmodule

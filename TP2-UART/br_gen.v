@@ -11,7 +11,7 @@ module br_gen
     output  wire    o_tick
 );
 
-   localparam TICK_RATE     = CLOCK_FREQUENCY / ( 16 * BAUD_RATE ); // 81.7
+   localparam integer TICK_RATE     = CLOCK_FREQUENCY / ( 16 * BAUD_RATE ); // 81.7
    localparam COUNT_NBITS   = $clog2( TICK_RATE );  // 7
 
    reg  [COUNT_NBITS-1:0]  counter;

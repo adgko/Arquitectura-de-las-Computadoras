@@ -6,7 +6,7 @@ module top
     parameter opcode = 6
 )
 (
-    input r_Clock,
+    input i_clock,
     input r_reset,              
     input rx_data,   
     
@@ -48,7 +48,7 @@ module top
     .reset(r_reset), // input reset
     .locked(locked),       // output locked
    // Clock in ports
-    .clk_in1(r_Clock)
+    .clk_in1(i_clock)
     );      // input clk_in1
 // INST_TAG_END ------ End INSTANTIATION Template ---------
       
@@ -69,7 +69,7 @@ module top
     
      intfv #() INTERFACE
     (
-        .i_clk(clk_50),
+        .i_Clock(clk_50),
         .i_reset(r_reset),
         .o_tx_start_bit(intf_to_tx_start),
         .o_alu_result(intf_to_tx_result),
