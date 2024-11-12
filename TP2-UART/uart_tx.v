@@ -67,11 +67,10 @@ module uart_tx
         // Send out Start Bit. Start bit = 0
         s_TX_START_BIT :
           begin
-            r_Tx_Serial = 1'b0;
-             
             // Wait CLKS_PER_BIT-1 clock cycles for start bit to finish
             if (i_bd)
               begin
+                r_Tx_Serial = 1'b0;
                 r_Tx_Data   = i_Tx_Byte;
                 r_next_state     = s_TX_DATA_BITS;
               end
