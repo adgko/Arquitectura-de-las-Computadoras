@@ -28,16 +28,26 @@ module intfv
 
 reg [2:0]    r_SM_Main     = 0;
 reg [DATA_SIZE-1:0] r_data_A =0;
+reg [DATA_SIZE-1:0] last_r_data_A =0;
 reg [DATA_SIZE-1:0] r_data_B =0;
+reg [DATA_SIZE-1:0] last_r_data_B =0;
 reg [OPCODE_SIZE-1:0] r_data_OPCODE =0;
+reg [OPCODE_SIZE-1:0] last_r_data_OPCODE =0;
 reg [DATA_SIZE-1:0] r_alu_result=0; 
+reg [DATA_SIZE-1:0] last_r_alu_result=0; 
 reg r_tx_start_bit=0;
+reg last_r_tx_start_bit=0;
 reg [3:0]     r_current_state = 0;
 reg [3:0]     r_next_state = 0;
 reg last_i_rx_done;
  
 always @(posedge i_Clock)
     begin
+        r_tx_start_bit<=last_r_tx_start_bit;
+        r_data_A<=last_r_data_A;
+        r_data_B<=last_r_data_B;
+        r_data_OPCODE<=last_r_data_OPCODE;
+        r_alu_result <= last_r_alu_result;
         if(i_reset) 
             begin
                 r_data_A <=0;
@@ -46,19 +56,24 @@ always @(posedge i_Clock)
                 r_current_state <= DATA_A;
                 r_alu_result<=0;
                 r_tx_start_bit<=0;
-                r_next_state<=0;
             end
         else r_current_state<=r_next_state;
         
     end
      
     always @(*) begin
+        last_r_tx_start_bit=r_tx_start_bit;
+        last_r_data_A=r_data_A;
+        last_r_data_B=r_data_B;
+        last_r_data_OPCODE=r_data_OPCODE;
+        r_next_state=r_current_state;
+        last_r_alu_result = r_alu_result;
         case (r_current_state)
             DATA_A:
                 begin
                     if(i_rx_done && ~last_i_rx_done )
                         begin
-                            r_data_A=i_data;
+                            last_r_data_A=i_data;
                             r_next_state=DATA_B;
                         end
                 end
@@ -67,7 +82,7 @@ always @(posedge i_Clock)
                     if(i_rx_done && ~last_i_rx_done )
                         begin
                             r_next_state=DATA_OPCODE;
-                            r_data_B=i_data;
+                            last_r_data_B=i_data;
                         end
                 end
             DATA_OPCODE:
@@ -75,12 +90,12 @@ always @(posedge i_Clock)
                     if(i_rx_done && ~last_i_rx_done )
                         begin
                             r_next_state=SEND_START;
-                            r_data_OPCODE=i_data[OPCODE_SIZE-1:0];
+                            last_r_data_OPCODE=i_data[OPCODE_SIZE-1:0];
                         end
                 end
             SEND_START:
                 begin
-                    r_tx_start_bit=1;
+                    last_r_tx_start_bit=1;
                     if(i_tx_active)
                         begin
                             r_next_state=SEND_BYTES;     
@@ -88,10 +103,10 @@ always @(posedge i_Clock)
                 end
             SEND_BYTES:
                 begin
-                    r_alu_result=i_alu_result;
+                    last_r_alu_result=i_alu_result;
                     if(i_tx_active)
                         begin
-                            r_tx_start_bit=0;  
+                            last_r_tx_start_bit=0;  
                         end
                     if(i_tx_done)
                     begin   
@@ -100,20 +115,20 @@ always @(posedge i_Clock)
                 end
             CLEAN:
                 begin
-                    r_data_A =0;
-                    r_data_B =0;
-                    r_data_OPCODE =0;
-                    r_alu_result=0;
-                    r_tx_start_bit=0;
+                    last_r_data_A =0;
+                    last_r_data_B =0;
+                    last_r_data_OPCODE =0;
+                    last_r_alu_result=0;
+                    last_r_tx_start_bit=0;
                     r_next_state= DATA_A;
                 end
             default: 
                 begin
-                    r_alu_result= 0;
-                    r_data_A =0;
-                    r_data_B =0;
-                    r_data_OPCODE =0;
-                    r_tx_start_bit=0;
+                    last_r_alu_result= 0;
+                    last_r_data_A =0;
+                    last_r_data_B =0;
+                    last_r_data_OPCODE =0;
+                    last_r_tx_start_bit=0;
                     r_next_state= DATA_A;
                 end
         endcase
@@ -126,3 +141,4 @@ always @(posedge i_Clock)
     assign o_alu_result=r_alu_result;
     assign o_tx_start_bit=r_tx_start_bit;
 endmodule
+	

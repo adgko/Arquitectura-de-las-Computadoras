@@ -20,12 +20,18 @@ module uart_tx
    
   reg [2:0]    r_SM_Main     = 0;
   reg [3:0]    r_Bit_Index   = 0;
+  reg [3:0]    last_r_Bit_Index   = 0;
   reg [7:0]    r_Tx_Data     = 0;
+  reg [7:0]    last_r_Tx_Data     = 0;
   reg          r_Tx_Done     = 0;
+  reg          last_r_Tx_Done    ;
   reg          r_Tx_Active   = 0;
+  reg          last_r_Tx_Active ;
   reg [3:0]    r_current_state = 0;
   reg [3:0]    r_next_state = 0;
   reg r_Tx_Serial=1;
+  reg last_r_Tx_Serial=1;
+ 
      
      
   //si hay cambio de tick, agrega uno al contador
@@ -38,6 +44,11 @@ module uart_tx
      
     always @(posedge i_Clock)
         begin
+        r_Tx_Active <= last_r_Tx_Active;
+        r_Tx_Serial <= last_r_Tx_Serial;
+        r_Tx_Done <= last_r_Tx_Done;
+        r_Bit_Index <= last_r_Bit_Index;
+        r_Tx_Data <= last_r_Tx_Data;
         if(i_reset) begin
             r_current_state <= s_IDLE;
         end
@@ -48,16 +59,21 @@ module uart_tx
     
     always @(*) begin
         r_next_state=r_current_state;
+        last_r_Tx_Active=r_Tx_Active;
+        last_r_Tx_Serial = r_Tx_Serial;
+        last_r_Tx_Done = r_Tx_Done;
+        last_r_Bit_Index = r_Bit_Index;
+        last_r_Tx_Data = r_Tx_Data;
         case (r_current_state)
         s_IDLE :
           begin
-            r_Tx_Done     = 1'b0;
-            r_Bit_Index   = 0;
-            r_Tx_Active   = 1'b0;
+            last_r_Tx_Done     = 1'b0;
+            last_r_Bit_Index   = 0;
+            last_r_Tx_Active   = 1'b0;
 
             if (i_Tx_Start == 1'b1)
               begin
-                r_Tx_Active = 1'b1;
+                last_r_Tx_Active = 1'b1;
                 r_next_state   = s_TX_START_BIT;
               end
             else r_next_state = s_IDLE;
@@ -70,8 +86,8 @@ module uart_tx
             // Wait CLKS_PER_BIT-1 clock cycles for start bit to finish
             if (i_bd)
               begin
-                r_Tx_Serial = 1'b0;
-                r_Tx_Data   = i_Tx_Byte;
+                last_r_Tx_Serial = 1'b0;
+                last_r_Tx_Data   = i_Tx_Byte;
                 r_next_state     = s_TX_DATA_BITS;
               end
             else r_next_state     = s_TX_START_BIT;
@@ -83,16 +99,16 @@ module uart_tx
         
             if (i_bd)
               begin
-                r_Tx_Serial = r_Tx_Data[r_Bit_Index];
+                last_r_Tx_Serial = last_r_Tx_Data[last_r_Bit_Index];
                 // Check if we have sent out all bits         
-                if (r_Bit_Index < 7)
+                if (last_r_Bit_Index < 7)
                   begin
-                    r_Bit_Index = r_Bit_Index + 1;
+                    last_r_Bit_Index = last_r_Bit_Index + 1;
                     r_next_state   = s_TX_DATA_BITS;
                   end
                 else
                   begin
-                    r_Bit_Index = 0;
+                    last_r_Bit_Index = 0;
                     r_next_state   = s_TX_STOP_BIT;
                   end
               end
@@ -106,8 +122,8 @@ module uart_tx
             // Wait CLKS_PER_BIT-1 clock cycles for Stop bit to finish
             if (i_bd)
               begin
-                r_Tx_Serial = 1'b1;
-                r_Tx_Done     = 1'b1;
+                last_r_Tx_Serial = 1'b1;
+                last_r_Tx_Done     = 1'b1;
                 r_next_state     = s_CLEANUP;
               end
             else    r_next_state     = s_TX_STOP_BIT;
@@ -117,17 +133,17 @@ module uart_tx
         // Stay here 1 clock
         s_CLEANUP :
           begin
-            r_Tx_Done = 1'b0;
-            r_Tx_Serial   = 1'b1;         // Drive Line High for Idle
+            last_r_Tx_Done = 1'b0;
+            last_r_Tx_Serial   = 1'b1;         // Drive Line High for Idle
             r_next_state = s_IDLE;
           end
          
          
         default :
           begin
-            r_Tx_Serial   = 1'b1;         // Drive Line High for Idle
-            r_Tx_Done     = 1'b0;
-            r_Bit_Index   = 0;
+            last_r_Tx_Serial   = 1'b1;         // Drive Line High for Idle
+            last_r_Tx_Done     = 1'b0;
+            last_r_Bit_Index   = 0;
             r_next_state = s_IDLE;
           end
          

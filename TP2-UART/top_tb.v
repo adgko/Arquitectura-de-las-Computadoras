@@ -11,11 +11,11 @@ module top_tb#()(
     
     integer counter = 0;
     
-    reg             r_Clock = 0;
-    reg             r_Clock50  = 0;
-    reg             r_reset = 0;         
-    reg             tx_start = 0;     
-    reg [Bits-1:0] tb_tx_byte = 0;
+    reg             r_Clock ;
+    reg             r_Clock50  ;
+    reg             r_reset;         
+    reg             tx_start ;     
+    reg [Bits-1:0] tb_tx_byte ;
     reg last_tx_active=1;
     
     wire tx_active;
