@@ -1,157 +1,134 @@
+`timescale 1ns / 1ps
+
 module uart_tx 
-  #(parameter Bits = 8,
-    parameter s_IDLE         = 3'b000,
-  parameter s_TX_START_BIT = 3'b001,
-  parameter s_TX_DATA_BITS = 3'b010,
-  parameter s_TX_STOP_BIT  = 3'b011,
-  parameter s_CLEANUP      = 3'b100)
-  (
-   input       i_Clock,
-   input       i_Tx_Start,
-   input [7:0] i_Tx_Byte, 
-   input        i_bd,
-   input        i_reset,
-   output      o_Tx_Active,
-   output     o_Tx_Serial,
-   output      o_Tx_Done
-   );
-  
+#(
+    parameter MAXTAM = 8, 
+    parameter BIT_COUNTER = 3 
+)
+(
+    input wire i_clk,               
+    input wire i_reset,             
+    input wire i_Tx_Start,         
+    input wire i_bd,              
+    input wire [(MAXTAM-1):0] i_Tx_Byte,   
+    output wire o_Tx_Done,      
+    output wire o_Tx_Serial                
 
-   
-  reg [2:0]    r_SM_Main     = 0;
-  reg [3:0]    r_Bit_Index   = 0;
-  reg [3:0]    last_r_Bit_Index   = 0;
-  reg [7:0]    r_Tx_Data     = 0;
-  reg [7:0]    last_r_Tx_Data     = 0;
-  reg          r_Tx_Done     = 0;
-  reg          last_r_Tx_Done    ;
-  reg          r_Tx_Active   = 0;
-  reg          last_r_Tx_Active ;
-  reg [3:0]    r_current_state = 0;
-  reg [3:0]    r_next_state = 0;
-  reg r_Tx_Serial=1;
-  reg last_r_Tx_Serial=1;
- 
-     
-     
-  //si hay cambio de tick, agrega uno al contador
- /* always @(posedge i_Clock)
-   begin
-    if(i_bd) begin
-        tick_count_aux = tick_count_reg+1;
+);
+
+localparam TICKS_MUESTREO = 16;          
+
+//ESTADOS (One-Hot)
+localparam [3:0]
+    IDLE     =   4'b0001,        //Estado de espera
+    START    =   4'b0010,        //Estado de transmision de start bit 
+    DATA     =   4'b0100,        //Estado de transmision de data bits
+    STOP     =   4'b1000;        //Estado de transmision de stop bit
+
+
+//VARIABLES LOCALES
+reg      r_tx_serial,            r_tx_serial_next;         
+reg      r_Tx_Done,           r_Tx_Done_Next;   
+reg[3:0] r_current_state,     r_next_state;       
+reg[3:0] ticks_count,       ticks_count_next;  
+reg[(BIT_COUNTER-1):0] r_Bit_Index,    r_Bit_Index_Next;  
+reg[(MAXTAM-1):0]       r_Tx_Data,     r_Tx_Data_Next;   
+
+
+
+always @ (posedge i_clk)
+begin
+    if (i_reset) begin
+        r_current_state   <= IDLE;
+        ticks_count     <= 0;
+        r_Bit_Index      <= 0;
+        r_Tx_Data      <= 0;
+        r_tx_serial          <= 1; //~start
+        r_Tx_Done         <= 0;
     end
-   end*/
-     
-    always @(posedge i_Clock)
-        begin
-        r_Tx_Active <= last_r_Tx_Active;
-        r_Tx_Serial <= last_r_Tx_Serial;
-        r_Tx_Done <= last_r_Tx_Done;
-        r_Bit_Index <= last_r_Bit_Index;
-        r_Tx_Data <= last_r_Tx_Data;
-        if(i_reset) begin
-            r_current_state <= s_IDLE;
-        end
-        else begin
-            r_current_state <=r_next_state;
-        end
-        end
-    
-    always @(*) begin
-        r_next_state=r_current_state;
-        last_r_Tx_Active=r_Tx_Active;
-        last_r_Tx_Serial = r_Tx_Serial;
-        last_r_Tx_Done = r_Tx_Done;
-        last_r_Bit_Index = r_Bit_Index;
-        last_r_Tx_Data = r_Tx_Data;
-        case (r_current_state)
-        s_IDLE :
-          begin
-            last_r_Tx_Done     = 1'b0;
-            last_r_Bit_Index   = 0;
-            last_r_Tx_Active   = 1'b0;
+    else begin
+        r_current_state   <= r_next_state;
+        ticks_count     <= ticks_count_next;
+        r_Bit_Index      <= r_Bit_Index_Next;
+        r_Tx_Data      <= r_Tx_Data_Next;
+        r_Tx_Done         <= r_Tx_Done_Next;
+        r_tx_serial          <= r_tx_serial_next;
+    end
+end
 
-            if (i_Tx_Start == 1'b1)
-              begin
-                last_r_Tx_Active = 1'b1;
-                r_next_state   = s_TX_START_BIT;
-              end
-            else r_next_state = s_IDLE;
-          end // case: s_IDLE
-         
-         
-        // Send out Start Bit. Start bit = 0
-        s_TX_START_BIT :
-          begin
-            // Wait CLKS_PER_BIT-1 clock cycles for start bit to finish
-            if (i_bd)
-              begin
-                last_r_Tx_Serial = 1'b0;
-                last_r_Tx_Data   = i_Tx_Byte;
-                r_next_state     = s_TX_DATA_BITS;
-              end
-            else r_next_state     = s_TX_START_BIT;
-          end // case: s_TX_START_BIT
-         
-        // Wait CLKS_PER_BIT-1 clock cycles for data bits to finish         
-        s_TX_DATA_BITS :
-          begin
-        
-            if (i_bd)
-              begin
-                last_r_Tx_Serial = last_r_Tx_Data[last_r_Bit_Index];
-                // Check if we have sent out all bits         
-                if (last_r_Bit_Index < 7)
-                  begin
-                    last_r_Bit_Index = last_r_Bit_Index + 1;
-                    r_next_state   = s_TX_DATA_BITS;
-                  end
+
+always @(*) begin
+
+    r_next_state          = r_current_state; 
+    ticks_count_next    = ticks_count;
+    r_Bit_Index_Next     = r_Bit_Index;
+    r_Tx_Data_Next     = r_Tx_Data;
+    r_Tx_Done_Next = r_Tx_Done;
+
+    case(r_current_state)
+        IDLE: begin
+            //tx_done_next = 0; ///probar en board
+            r_tx_serial_next = 1; //~start
+            if ( i_Tx_Start )
+            begin
+                r_next_state          = START;
+                ticks_count_next    = 0;             
+                r_Tx_Data_Next     = i_Tx_Byte;  
+            end
+        end
+
+        START: begin
+            r_Tx_Done_Next= 0;
+            r_tx_serial_next = 0; 
+            if( i_bd ) begin
+                if (ticks_count == (TICKS_MUESTREO - 1)) 
+                    begin
+                        r_next_state          = DATA;
+                        ticks_count_next    = 0; 
+                        r_Bit_Index_Next     = 0; 
+                    end
                 else
-                  begin
-                    last_r_Bit_Index = 0;
-                    r_next_state   = s_TX_STOP_BIT;
-                  end
-              end
-            else r_next_state     = s_TX_DATA_BITS;
-          end // case: s_TX_DATA_BITS
-         
-         
-        // Send out Stop bit.  Stop bit = 1
-        s_TX_STOP_BIT :
-          begin
-            // Wait CLKS_PER_BIT-1 clock cycles for Stop bit to finish
-            if (i_bd)
-              begin
-                last_r_Tx_Serial = 1'b1;
-                last_r_Tx_Done     = 1'b1;
-                r_next_state     = s_CLEANUP;
-              end
-            else    r_next_state     = s_TX_STOP_BIT;
+                    ticks_count_next        = ticks_count + 1;
+            end
+        end
 
-          end // case: s_Tx_STOP_BIT
-         
-        // Stay here 1 clock
-        s_CLEANUP :
-          begin
-            last_r_Tx_Done = 1'b0;
-            last_r_Tx_Serial   = 1'b1;         // Drive Line High for Idle
-            r_next_state = s_IDLE;
-          end
-         
-         
-        default :
-          begin
-            last_r_Tx_Serial   = 1'b1;         // Drive Line High for Idle
-            last_r_Tx_Done     = 1'b0;
-            last_r_Bit_Index   = 0;
-            r_next_state = s_IDLE;
-          end
-         
-      endcase
-    end
- 
-  assign o_Tx_Active = r_Tx_Active;
-  assign o_Tx_Done   = r_Tx_Done;
-  assign o_Tx_Serial=r_Tx_Serial;
-   
+        DATA: begin
+            r_tx_serial_next= r_Tx_Data[0];
+            if ( i_bd ) begin
+                if (ticks_count == (TICKS_MUESTREO - 1) ) begin
+                        ticks_count_next    = 0;                 
+                        r_Tx_Data_Next     = r_Tx_Data >> 1;    //sig bit 
+                        if ( r_Bit_Index == (MAXTAM-1) )  
+                                r_next_state  = STOP;               //se envio la trama
+                        else
+                            r_Bit_Index_Next = r_Bit_Index + 1;
+                    end
+                else 
+                    ticks_count_next = ticks_count + 1; 
+            end
+        end
+
+        STOP: begin
+            r_tx_serial_next = 1; //bit de stop es un 1
+            if ( i_bd ) begin
+                if ( ticks_count == (TICKS_MUESTREO - 1) ) begin
+                    r_next_state       = IDLE;
+                    r_Tx_Done_Next     = 1;       //termino de enviar
+                end
+                else 
+                    ticks_count_next = ticks_count + 1; 
+            end
+        end
+
+        default: begin
+            r_tx_serial_next     = 1; //Evitar envio erroneo
+            r_next_state  = IDLE; 
+        end
+    endcase
+end
+
+
+assign o_Tx_Serial = r_tx_serial;
+assign o_Tx_Done = r_Tx_Done;
+
 endmodule

@@ -1,27 +1,74 @@
-`timescale 1ns / 1ns
+`timescale 1ns / 1ps
+
 module alu
-#(  //Parameters:
-    parameter MAXTAM = 8,
-    parameter OPCODE = 6
-)(  // Inputs & Outputs:
-    input  wire [MAXTAM-1:0] A,       // registro A
-    input  wire [MAXTAM-1:0] B,       // registro B
-    input  wire [OPCODE-1:0] OP,      // la operación a realizar
+    #(
+    //parameter
+    parameter          MAXTAM     = 8
+    )
+    (
+    //inputs
+    input  wire        [MAXTAM - 1:0]                      data_a,
+    input  wire        [MAXTAM - 1:0]                      data_b,
+    input  wire        [MAXTAM - 3:0]                          op,
     
-    output reg  [MAXTAM-1:0] ALU_Result // ALU Output
-);
+    //outputs
+    output wire        [MAXTAM - 1:0]                         o_alu_Result,
+    output wire                                                o_carry
+    );
     
-    always @(*) begin   
-      case(OP)
-         6'b10_0000: ALU_Result = A+B ; // 32d=20h ? SUMA
-         6'b10_0010: ALU_Result = A-B ; // 34d=22h ? RESTA
-         6'b10_0100: ALU_Result = A & B; // 36d=24h ? AND 
-         6'b10_0101: ALU_Result = A | B; // 37d=25h ? OR
-         6'b10_0110: ALU_Result = A ^ B; // 38d=26h ? XOR 
-         6'b10_0111: ALU_Result = ~(A | B); // 39d=27h ? NOR
-         6'b00_0010: ALU_Result = A>>B; // 2d=2h ? Desplazamiento lógico Der
-         6'b00_0011: ALU_Result = A>>>B; // 3d=3h ? Desplazamiento aritmético Der
-         default: ALU_Result = {MAXTAM{1'b0}};
-      endcase
+    localparam ADD = 6'b100000;
+    localparam SUB = 6'b100010;
+    localparam AND = 6'b100100;
+    localparam OR  = 6'b100101;
+    localparam XOR = 6'b100110;
+    localparam SRA = 6'b000011;
+    localparam SRL = 6'b000010;
+    localparam NOR = 6'b100111;
+
+    reg carry;
+    reg [MAXTAM : 0] aluResult;
+    assign o_alu_Result = aluResult;
+    assign o_carry = carry;
+         
+    always @(*) begin
+        case (op)
+        ADD: begin
+                aluResult = (data_a) + (data_b); //ADD
+                carry = aluResult[MAXTAM];
+             end
+        SUB: begin
+                aluResult = (data_a) - (data_b); //SUB
+                carry = aluResult[MAXTAM];
+             end
+        AND: begin
+                aluResult = data_a & data_b; //AND
+                carry = 1'b0;
+             end
+        OR : begin
+                aluResult = data_a | data_b; //OR
+                carry = 1'b0;
+             end
+        XOR: begin
+                aluResult = data_a ^ data_b; //XOR
+                carry = 1'b0;
+             end
+        SRA: begin
+                aluResult = $signed(data_a) >>> data_b; //SRA
+                carry = 1'b0;
+             end
+        SRL: begin
+                aluResult = data_a >> data_b; //SRL
+                carry = 1'b0;
+             end
+        NOR: begin
+                aluResult = ~(data_a | data_b); //NOR
+                carry = 1'b0;
+             end
+        default: begin
+                    aluResult = {MAXTAM{1'b0}};
+                    carry = 1'b0;
+                 end
+        endcase
+  
     end
-endmodule//alu_module
+endmodule
